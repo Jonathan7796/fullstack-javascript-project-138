@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import loadPage from '../src/page-loader.js';
+import loadPage from '../src/page-loader';
 
 const program = new Command();
 
@@ -14,9 +14,11 @@ program
   .action((url, options) => {
     loadPage(url, options.output)
       .then((filePath) => {
+        // eslint-disable-next-line no-console
         console.log(filePath);
       })
       .catch((err) => {
+        // eslint-disable-next-line no-console
         console.error(`Error: ${err.message}`);
         process.exit(1);
       });
