@@ -1,37 +1,72 @@
-import fs from 'fs/promises';
+import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import nock from 'nock';
-import pageLoader from '../src/index.js';
 
-const url = 'https://codica.la/cursos';
-const htmlMock = '<html><body>Curso</body></html>';
+import loadPage from '../src/page-loader.js';
+import buildFilename from '../src/buildFilename.js';
 
-beforeEach(() => {
+const getFixturePath = (filename) =>
+  path.join(process.cwd(), '__fixtures__', filename);
+
+let tempDir;
+
+beforeAll(() => {
+  // Asegura que Nock no salga a internet
   nock.disableNetConnect();
 });
 
-test('descarga página correctamente', async () => {
-  // Crear directorio temporal aislado
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'page-loader-'));
+beforeEach(async () => {
+  tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'page-loader-'));
+});
 
-  // Mock HTTP
-  nock('https://codica.la')
-    .get('/cursos')
-    .reply(200, htmlMock);
+describe('buildFilename', () => {
+  test('genera correctamente el nombre del archivo', () => {
+    const url = 'https://codica.la/cursos';
+    const expected = 'codica-la-cursos.html';
 
-  // Ejecutar la función principal
-  const filepath = await pageLoader(url, tempDir);
+    expect(buildFilename(url)).toBe(expected);
+  });
+});
 
-  // Leer el archivo guardado
-  const data = await fs.readFile(filepath, 'utf-8');
+describe('loadPage', () => {
+  test('descarga y guarda una página correctamente', async () => {
+    const url = 'https://example.com/page';
 
-  // Verificar
-  expect(data).toBe(htmlMock);
+    const fixtureHTML = await fs.readFile(getFixturePath('sample.html'), 'utf-8');
 
-  // Verificar que el archivo tenga formato correcto
-  const expectedName = 'codica-la-cursos.html';
-  const expectedPath = path.join(tempDir, expectedName);
+    // Mock de la respuesta HTTP
+    nock('https://example.com')
+      .get('/page')
+      .reply(200, fixtureHTML);
 
-  expect(filepath).toBe(expectedPath);
+    const filePath = await loadPage(url, tempDir);
+
+    const savedContent = await fs.readFile(filePath, 'utf-8');
+    expect(savedContent).toBe(fixtureHTML);
+  });
+
+  test('maneja correctamente un error 404', async () => {
+    const url = 'https://example.com/not-found';
+
+    nock('https://example.com')
+      .get('/not-found')
+      .reply(404);
+
+    await expect(loadPage(url, tempDir))
+      .rejects
+      .toThrow('Request failed with status code 404');
+  });
+
+  test('maneja error de conexión', async () => {
+    const url = 'https://bad.domain/test';
+
+    nock('https://bad.domain')
+      .get('/test')
+      .replyWithError('connection failed');
+
+    await expect(loadPage(url, tempDir))
+      .rejects
+      .toThrow('connection failed');
+  });
 });
