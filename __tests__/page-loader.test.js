@@ -1,13 +1,12 @@
-import { promises as fs } from 'fs';
-import os from 'os';
 import path from 'path';
+import os from 'os';
+import { promises as fs } from 'fs';
 import nock from 'nock';
 
-import loadPage from '../src/page-loader';
-import buildFilename from '../src/buildFilename';
+import loadPage from '../src/page-loader.js';
+import buildFilename from '../src/buildFilename.js';
 
-const getFixturePath = (filename) =>
-  path.join(process.cwd(), '__fixtures__', filename);
+const fixtureHTML = '<html><body><h1>Sample page</h1></body></html>';
 
 let tempDir;
 
@@ -19,18 +18,27 @@ beforeEach(async () => {
   tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'page-loader-'));
 });
 
+afterEach(() => {
+  nock.cleanAll();
+});
+
+afterAll(() => {
+  nock.enableNetConnect();
+});
+
 describe('buildFilename', () => {
-  test('genera correctamente el nombre del archivo', () => {
+  test('builds filename from url', () => {
     const url = 'https://codica.la/cursos';
     const expected = 'codica-la-cursos.html';
+
     expect(buildFilename(url)).toBe(expected);
   });
 });
 
 describe('loadPage', () => {
-  test('descarga y guarda una página correctamente', async () => {
+  test('downloads page and saves it to output directory', async () => {
     const url = 'https://example.com/page';
-    const fixtureHTML = await fs.readFile(getFixturePath('sample.html'), 'utf-8');
+    const expectedFilePath = path.join(tempDir, 'example-com-page.html');
 
     nock('https://example.com')
       .get('/page')
@@ -39,10 +47,11 @@ describe('loadPage', () => {
     const filePath = await loadPage(url, tempDir);
     const savedContent = await fs.readFile(filePath, 'utf-8');
 
+    expect(filePath).toBe(expectedFilePath);
     expect(savedContent).toBe(fixtureHTML);
   });
 
-  test('maneja correctamente un error 404', async () => {
+  test('rejects on http error', async () => {
     const url = 'https://example.com/not-found';
 
     nock('https://example.com')
@@ -54,7 +63,7 @@ describe('loadPage', () => {
     );
   });
 
-  test('maneja error de conexión', async () => {
+  test('rejects on network error', async () => {
     const url = 'https://bad.domain/test';
 
     nock('https://bad.domain')

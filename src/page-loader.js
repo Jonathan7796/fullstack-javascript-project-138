@@ -1,11 +1,11 @@
 import axios from 'axios';
 import { promises as fs } from 'fs';
 import path from 'path';
-import buildFilename from './buildFilename';
+import buildFilename from './buildFilename.js';
 
 const loadPage = (url, outputDir = process.cwd()) => {
   const fileName = buildFilename(url);
-  const fullPath = path.join(outputDir, fileName);
+  const fullPath = path.resolve(outputDir, fileName);
 
   return axios
     .get(url)
@@ -14,4 +14,3 @@ const loadPage = (url, outputDir = process.cwd()) => {
 };
 
 export default loadPage;
-
